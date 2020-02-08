@@ -1,0 +1,189 @@
+version: "3"
+
+services:
+  namenode:
+    build: ./namenode
+    image: bde2020/hadoop-namenode:1.1.0-hadoop2.7.1-java8
+    container_name: namenode
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop.env
+    ports:
+      - "9870:50070"
+    extra_hosts: 
+      - "datanode1:172.19.0.3"
+      - "datanode2:172.19.0.4"
+      - "datanode3:172.19.0.5"
+    networks: 
+      hdfsNetwork:
+          ipv4_address: 172.19.0.2
+          aliases: 
+            - namenode
+
+  datanode1:
+    hostname: datanode1
+    build: ./datanode
+    image: bde2020/hadoop-datanode:1.1.0-hadoop2.7.1-java8
+    container_name: datanode1
+    depends_on:
+      - namenode
+    volumes:
+      - hadoop_datanode1:/hadoop/dfs/data
+    env_file:
+      - ./hadoop.env
+    networks: 
+      hdfsNetwork:
+          ipv4_address: 172.19.0.3
+
+  datanode2:
+    hostname: datanode2
+    build: ./datanode
+    image: bde2020/hadoop-datanode:1.1.0-hadoop2.7.1-java8
+    container_name: datanode2
+    depends_on:
+      - namenode
+    volumes:
+      - hadoop_datanode2:/hadoop/dfs/data
+    env_file:
+      - ./hadoop.env
+    networks: 
+      hdfsNetwork:
+          ipv4_address: 172.19.0.4
+          aliases: 
+            - datanode2
+
+  datanode3:
+    hostname: datanode3
+    build: ./datanode
+    image: bde2020/hadoop-datanode:1.1.0-hadoop2.7.1-java8
+    container_name: datanode3
+    depends_on:
+      - namenode
+    volumes:
+      - hadoop_datanode3:/hadoop/dfs/data
+    env_file:
+      - ./hadoop.env
+    networks: 
+      hdfsNetwork:
+          ipv4_address: 172.19.0.5
+          aliases: 
+            - datanode3
+
+  resourcemanager:
+    build: ./resourcemanager
+    image: bde2020/hadoop-resourcemanager:1.1.0-hadoop2.7.1-java8
+    container_name: resourcemanager
+    depends_on:
+      - namenode
+      - datanode1
+      - datanode2
+    env_file:
+      - ./hadoop.env
+    ports:
+      - "8089:8088"
+    networks: 
+      hdfsNetwork:
+        ipv4_address: 172.19.0.6
+
+  historyserver:
+    build: ./historyserver
+    image: bde2020/hadoop-historyserver:1.1.0-hadoop2.7.1-java8
+    container_name: historyserver
+    depends_on:
+      - namenode
+      - datanode1
+      - datanode2
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ./hadoop.env
+    networks: 
+      hdfsNetwork:
+        ipv4_address: 172.19.0.7
+      
+  nodemanager1:
+    build: ./nodemanager
+    image: bde2020/hadoop-nodemanager:1.1.0-hadoop2.7.1-java8
+    container_name: nodemanager1
+    depends_on:
+      - namenode
+      - datanode1
+      - datanode2
+    env_file:
+      - ./hadoop.env
+    networks: 
+      hdfsNetwork:
+        ipv4_address: 172.19.0.8
+  middleware:
+    build:
+      context: ../
+      args:                                                                     
+        - JAR_FILE=out/artifacts/hadoop_jar/*.jar
+    image: springio/gs-spring-boot-docker
+    container_name: middleware
+    volumes:
+      - /home/adrian/hadoop-data/:/home/
+    ports:
+      - "8080:8080"
+    networks: 
+      hdfsNetwork:
+        ipv4_address: 172.19.0.9
+  prometheus:
+    build:
+      context: .
+    image: prom/prometheus
+    container_name: prometheus
+    volumes: 
+      - "../prometheus.yml:/etc/prometheus/prometheus.yml"
+    network_mode: host
+    ports: 
+      - "9090:9090"
+  
+  grafana:
+    build:
+      context: .
+    image: grafana/grafana
+    container_name: grafana
+    network_mode: host
+    
+  node-exporter:
+    build:
+      context: .
+    image: prom/node-exporter
+    container_name: node-exporter
+    network_mode: host
+    volumes: 
+      - "/:/host:ro"
+    command:
+        - '--path.rootfs=/host'
+
+  interface:
+      build: ../react-filemanager
+      command: npm start
+      network_mode: host
+      container_name: interface
+      volumes:
+        - ../react-filemanager:/usr/src/app
+        - /usr/src/app/node_modules
+      ports:
+        - "3001:3001"
+  cli:
+    build:
+      context: ../hadoop-cli
+    container_name: cli
+    network_mode: host
+networks:
+  default:
+  hdfsNetwork:
+    ipam: 
+      config: 
+        - subnet: 172.19.0.0/16
+volumes:
+  hadoop_namenode:
+  hadoop_datanode1:
+  hadoop_datanode2:
+  hadoop_datanode3:
+  hadoop_historyserver:
