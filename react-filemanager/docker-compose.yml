@@ -1,0 +1,11 @@
+version: '2'
+services:
+  web:
+    build: .
+    command: npm start
+    network_mode: host
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "3001:3001"
